@@ -6,8 +6,6 @@ import (
 	"sort"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/kstkn/hypersomnia/micro"
 
 	"github.com/micro/go-micro/registry"
@@ -16,10 +14,19 @@ import (
 type ServicesHandler struct {
 	localClient micro.ClientWrapper
 	webClient   micro.ClientWrapper
+	logger      Logger
 }
 
-func NewServicesHandler(localClient micro.ClientWrapper, webClient micro.ClientWrapper) ServicesHandler {
-	return ServicesHandler{localClient, webClient}
+type Logger interface {
+	Warn(message string, fields ...[2]string)
+}
+
+func NewServicesHandler(logger Logger, localClient micro.ClientWrapper, webClient micro.ClientWrapper) ServicesHandler {
+	return ServicesHandler{
+		localClient: localClient,
+		webClient:   webClient,
+		logger:      logger,
+	}
 }
 
 func (h ServicesHandler) getClient(env string) micro.ClientWrapper {
@@ -55,10 +62,7 @@ func (h ServicesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var serviceInfo *registry.Service
 			serviceInfo, err := h.getClient(req.Environment).GetService(req.Environment, service.Name)
 			if err != nil {
-				log.WithFields(log.Fields{
-					"environment": req.Environment,
-					"service":     service.Name,
-				}).Warn(err)
+				h.logger.Warn(err.Error(), [2]string{"environment", req.Environment}, [2]string{"service", service.Name})
 				messages <- nil
 				return
 			}

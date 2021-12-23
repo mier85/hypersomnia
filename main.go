@@ -1,41 +1,27 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/micro/go-micro/client"
+	"github.com/kstkn/hypersomnia/server"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/kstkn/hypersomnia/config"
-	"github.com/kstkn/hypersomnia/handler"
-	"github.com/kstkn/hypersomnia/micro"
 )
 
-var conf config.Config
+type LogrusWrapper struct {
+	*log.Logger
+}
 
-func init() {
-	conf = config.NewConfig()
-
-	log.SetLevel(conf.LogLevel)
-	log.Debugf("configuration %+v", conf)
-
-	localClient := micro.NewLocalClient(
-		client.NewClient(client.Registry(conf.GetRegistry())),
-		conf.GetRegistry(),
-		conf.RpcRequestTimeout,
-	)
-	webClient := micro.NewMultiWebClient(conf.Environments)
-
-	http.Handle("/", handler.NewIndexHandler(localClient, webClient))
-	http.Handle("/service", handler.NewServiceHandler(localClient, webClient))
-	http.Handle("/services", handler.NewServicesHandler(localClient, webClient))
-	http.Handle("/call", handler.NewCallHandler(localClient, webClient))
+func (l *LogrusWrapper) Warn(message string, fields ...[2]string) {
+	logFields := make(log.Fields, len(fields))
+	for _, msg := range fields {
+		logFields[msg[0]] = msg[1]
+	}
+	l.WithFields(logFields).Warn(message)
 }
 
 func main() {
-	log.Info("starting web server on " + conf.Addr)
-	s := &http.Server{
-		Addr: conf.Addr,
-	}
-	log.Fatal(s.ListenAndServe())
+	conf := config.NewConfig()
+	log.SetLevel(conf.LogLevel)
+	log.Debugf("configuration %+v", conf)
+	server.StartServer(&LogrusWrapper{log.StandardLogger()}, conf)
 }
